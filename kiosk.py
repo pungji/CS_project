@@ -5,6 +5,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.popup import Popup
 from kivy.core.text import LabelBase
 from kivy.clock import Clock
+import requests  # Importing the requests library
 
 class MyKiosk(App):
     def build(self):
@@ -40,7 +41,7 @@ class MyKiosk(App):
         layout.add_widget(skewer_button)
 
         order_button = Button(text='주문하기', font_name='NanumGothic')
-        order_button.bind(on_press=self.show_order_confirmation)
+        order_button.bind(on_press=self.send_order_to_server)  # Change binding to send_order_to_server
         layout.add_widget(order_button)
 
         reset_button = Button(text='주문 초기화', font_name='NanumGothic')
@@ -61,41 +62,15 @@ class MyKiosk(App):
         self.total_price += self.menu_prices['문꼬치']
         self.update_order_label()
 
-    def show_order_confirmation(self, instance):
-        if self.order_count == 0:
-            popup = Popup(title='ALERT', content=Label(text='주문량이 0입니다. 메뉴를 선택해주세요.', font_name='NanumGothic'), size_hint=(None, None), size=(300, 200))
+    def send_order_to_server(self, instance):  # New method to send order data to the server
+        order_data = {'order_count': self.order_count, 'order_history': self.order_history, 'total_price': self.total_price}
+        response = requests.post('http://your-server-url.com/order', json=order_data)
+        if response.status_code == 200:
+            popup = Popup(title='Order Sent', content=Label(text='주문이 성공적으로 전송되었습니다.', font_name='NanumGothic'), size_hint=(None, None), size=(300, 200))
             popup.open()
         else:
-            confirmation_text = f'주문 내역:\n'
-            for item, quantity in self.order_history.items():
-                if quantity > 0:
-                    confirmation_text += f"{item}: {quantity}개 - {self.menu_prices[item] * quantity}원\n"
-            confirmation_text += f'\n총 가격: {self.total_price}원\n\n이렇게 주문하시겠습니까?'
-
-            confirmation_popup = Popup(title='ORDER', size_hint=(None, None), size=(400, 300))
-            popup_content = BoxLayout(orientation='vertical')
-            popup_content.add_widget(Label(text=confirmation_text, font_name='NanumGothic'))
-            button_layout = BoxLayout(orientation='horizontal', size_hint=(1, None), height=50)
-            yes_button = Button(text='예', font_name='NanumGothic', size_hint=(0.5, 1))
-            yes_button.bind(on_press=self.complete_order)
-            no_button = Button(text='아니요', font_name='NanumGothic', size_hint=(0.5, 1))
-            no_button.bind(on_press=confirmation_popup.dismiss)
-            button_layout.add_widget(yes_button)
-            button_layout.add_widget(no_button)
-            popup_content.add_widget(button_layout)
-            confirmation_popup.content = popup_content
-            confirmation_popup.open()
-
-    def complete_order(self, instance):
-        self.reset_order_count()
-        complete_popup = Popup(title='ALERT', content=Label(text='주문이 완료되었습니다.', font_name='NanumGothic'), size_hint=(None, None), size=(300, 200))
-        complete_popup.open()
-        Clock.schedule_once(self.close_popup, 1)  # 1초 후에 팝업 닫기
-
-    def close_popup(self, dt):
-        for widget in App.get_running_app().root_window.children:
-            if isinstance(widget, Popup):
-                widget.dismiss()
+            popup = Popup(title='Order Failed', content=Label(text='주문 전송에 실패했습니다.', font_name='NanumGothic'), size_hint=(None, None), size=(300, 200))
+            popup.open()
 
     def reset_order_count(self, instance=None):
         self.order_count = 0
@@ -110,6 +85,7 @@ class MyKiosk(App):
                 order_text += f"{item}: {quantity}개 - {self.menu_prices[item] * quantity}원\n"
         self.order_history_label.text = order_text
         self.order_label.text = f'주문량: {self.order_count}\n합계 가격: {self.total_price}원'
+        
 
 if __name__ == '__main__':
     MyKiosk().run()
